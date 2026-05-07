@@ -354,7 +354,8 @@ server <- function(input, output, session) {
     round     = 1,
     pidx      = 1,
     winner    = NULL,
-    in_status = NULL
+    in_status = NULL,
+    undo_mode = FALSE
   )
   
   current_player <- reactive({
@@ -417,6 +418,7 @@ server <- function(input, output, session) {
     game$pidx    <- 1
     game$winner  <- NULL
     game$busts   <- setNames(rep(0L, n), players)
+    game$undo_mode <- FALSE
     game$started <- TRUE
   })
   
@@ -503,7 +505,7 @@ server <- function(input, output, session) {
               ),
           ),
           
-
+          
         ),
         # Right column: leaderboard + bust on top, chart on bottom
         div(
@@ -586,13 +588,23 @@ server <- function(input, output, session) {
     
     if (game$scores[p] >= game$win_score) game$winner <- p
     
-    # Advance turn
-    if (game$pidx < length(game$players)) {
-      game$pidx <- game$pidx + 1
+    # Only advance turn if NOT in undo mode (undo entries don't advance)
+    if (!game$undo_mode) {
+      if (game$pidx < length(game$players)) {
+        game$pidx <- game$pidx + 1
+      } else {
+        game$pidx  <- 1
+        game$round <- game$round + 1
+      }
     } else {
-      game$pidx  <- 1
-      game$round <- game$round + 1
-      # Reset all players' in_status for new round
+      # In undo mode, just advance to next player (don't increment round)
+      if (game$pidx < length(game$players)) {
+        game$pidx <- game$pidx + 1
+      } else {
+        game$pidx  <- 1
+        game$round <- game$round + 1
+      }
+      game$undo_mode <- FALSE
     }
     
     updateNumericInput(session, "round_score", value = 0)
@@ -604,45 +616,37 @@ server <- function(input, output, session) {
     
     # Get the last entry in history
     last_entry <- game$history[nrow(game$history), ]
+    p <- last_entry$player
+    val <- last_entry$round_score
+    undo_round <- last_entry$round
     
     # Remove the last entry from history
     game$history <- game$history[-nrow(game$history), ]
     
     # Reverse the score change
-    p <- last_entry$player
-    val <- last_entry$round_score
     game$scores[p] <- game$scores[p] - val
     
-    # Reverse bust counter if it was a bust
-    if (val == 0) game$scores[p] <- game$scores[p] + val
+    # Reverse bust counter if it was a bust (0 points = bust)
     if (val == 0) game$busts[p] <- pmax(0L, game$busts[p] - 1L)
     
-    # Go back to the player who just played
-    # Find the index of the player to undo
-    player_idx <- which(game$players == p)
-    
-    # Go back one turn
-    if (player_idx == 1) {
-      # If first player, go back to last player of previous round
-      if (game$round > 1) {
-        game$pidx <- length(game$players)
-        game$round <- game$round - 1
-      } else {
-        # Already at first turn, can't undo further - just keep pidx at 1
-        game$pidx <- 1
-      }
-    } else {
-      game$pidx <- player_idx - 1
-    }
-    
-    # Clear winner if they had reached the winning score
-    if (!is.null(game$winner) && game$winner == p && game$scores[p] < game$win_score) {
+    # Clear winner if they had won
+    if (!is.null(game$winner) && game$winner == p) {
       game$winner <- NULL
     }
     
-    # Reset in_status for the player being undone so they can get in again
-    game$in_status[p] <- FALSE
+    # Move pidx back to the player who just had their score undone
+    game$pidx <- which(game$players == p)
     
+    # Keep them in "in" status so they can re-enter their score
+    game$in_status[p] <- TRUE
+    
+    # Restore the round number to the round that was undone
+    game$round <- undo_round
+    
+    # Set undo mode flag so turn advancement is skipped on re-entry
+    game$undo_mode <- TRUE
+    
+    # Clear the score input
     updateNumericInput(session, "round_score", value = 0)
   })
   
@@ -733,6 +737,9 @@ server <- function(input, output, session) {
   
   # -- Chart ────────────────────────────────────────────────────────────────────
   output$score_plot <- renderPlot({
+    # Explicitly depend on game$history to trigger re-render on every score entry
+    history_trigger <- nrow(game$history)
+    
     req(game$started)
     df   <- game$history
     ws   <- game$win_score
@@ -744,9 +751,6 @@ server <- function(input, output, session) {
     grid_col <- if (is_light) "#00000015" else "#ffffff22"
     point_col <- if (is_light) "#ffffff" else "#1a1a2e"
     
-    # Only include rounds where every player has submitted.
-    complete_rounds <- seq_len(game$round - 1)
-    
     # Origin row for every player at round 0
     origin <- data.frame(
       round = 0L, player = game$players,
@@ -754,15 +758,14 @@ server <- function(input, output, session) {
       stringsAsFactors = FALSE
     )
     
-    # Pull only completed-round rows from history
-    df_complete <- df[df$round %in% complete_rounds, ]
-    df2 <- rbind(origin, df_complete)
+    # Use all history entries (not just complete rounds)
+    df2 <- rbind(origin, df)
     
-    # If no complete rounds yet show placeholder
-    if (nrow(df_complete) == 0) {
+    # If no entries yet show placeholder
+    if (nrow(df) == 0) {
       return(ggplot() +
                annotate("text", x = .5, y = .5,
-                        label = "Chart updates after each\ncomplete round",
+                        label = "Chart updates after each\nscore entry",
                         color = text_col, size = 5.5, hjust = .5) +
                theme_void() +
                theme(plot.background  = element_rect(fill = "transparent", color = NA),
@@ -772,8 +775,9 @@ server <- function(input, output, session) {
     # Label at the latest point for each player
     last_pts <- do.call(rbind, lapply(game$players, function(p) {
       sub <- df2[df2$player == p, ]
-      sub[nrow(sub), ]
+      if (nrow(sub) > 0) sub[nrow(sub), ] else NULL
     }))
+    last_pts <- last_pts[!is.null(last_pts), ]
     
     max_round <- max(df2$round)
     
@@ -796,7 +800,7 @@ server <- function(input, output, session) {
                          expand = expansion(mult = c(0, .1))) +
       scale_x_continuous(
         breaks = seq(0, max_round),
-        labels = function(x) ifelse(x == 0, "Start", paste( x)),
+        labels = function(x) ifelse(x == 0, "Start", paste(x)),
         expand = expansion(mult = c(.02, .16))
       ) +
       labs(x = "Round", y = "Cumulative Score") +
@@ -821,6 +825,5 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 
 ## TODO:
-## - add an undo last turn button 
 ## - allow for clicking enter to add scores
 ## - add tab for full score sheet
