@@ -208,6 +208,17 @@ ui <- fluidPage(
         flex: 1;
         margin-bottom: 0 !important;
       }
+      .btn-bust-red {
+        background: #e74c3c !important; border: none !important;
+        border-radius: 10px !important; font-family: 'Fredoka One', cursive !important;
+        font-size: 1.75rem !important; color: #fff !important; padding: 12px 28px !important;
+        transition: transform .15s, box-shadow .15s !important;
+        box-shadow: 0 4px 14px rgba(231, 76, 60, .35) !important;
+        flex: 1;
+        margin-bottom: 0 !important;
+      }
+      .btn-bust-red:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(231, 76, 60, .5) !important; }
+      .btn-bust-red:disabled { opacity: 0.5; cursor: not-allowed; }
       .btn-undo {
         background: #95a5a6 !important; border: none !important;
         border-radius: 8px !important; font-family: 'Fredoka One', cursive !important;
@@ -467,7 +478,7 @@ server <- function(input, output, session) {
                        if (!game$in_status[p]) {
                          div(class = "in-bust-row",
                              actionButton("player_in", "✓ In", class = "btn-in"),
-                             actionButton("player_bust", "✗ Bust", class = "btn-in-bust")
+                             actionButton("player_bust", "💥 Bust", class = "btn-in-bust")
                          )
                        } else {
                          # Show score input and submit button once player is in
@@ -477,6 +488,8 @@ server <- function(input, output, session) {
                            ),
                            div(class = "score-buttons-row",
                                actionButton("submit_score", btn_label, class = "btn-success",
+                                            disabled = if (!is.null(game$winner)) "disabled" else NULL),
+                               actionButton("bust_after_in", "Bust", class = "btn-bust-red",
                                             disabled = if (!is.null(game$winner)) "disabled" else NULL),
                                actionButton("undo_score", icon("undo"), class = "btn-undo")
                            )
@@ -563,6 +576,47 @@ server <- function(input, output, session) {
       game$pidx  <- 1
       game$round <- game$round + 1
       # Reset all players' in_status for new round
+    }
+    
+    updateNumericInput(session, "round_score", value = 0)
+  })
+  
+  # ── Player busts after being "in" (scores 0 points) ──────────────────────────
+  observeEvent(input$bust_after_in, {
+    if (!game$started || !is.null(game$winner)) return()
+    
+    p   <- current_player()
+    val <- 0  # Bust means 0 points
+    
+    game$scores[p] <- game$scores[p] + val
+    game$busts[p] <- game$busts[p] + 1L  # Increment bust counter
+    
+    game$history <- rbind(game$history, data.frame(
+      round       = game$round,
+      player      = p,
+      round_score = val,
+      total       = game$scores[p],
+      stringsAsFactors = FALSE
+    ))
+    
+    if (game$scores[p] >= game$win_score) game$winner <- p
+    
+    # Advance turn
+    if (!game$undo_mode) {
+      if (game$pidx < length(game$players)) {
+        game$pidx <- game$pidx + 1
+      } else {
+        game$pidx  <- 1
+        game$round <- game$round + 1
+      }
+    } else {
+      if (game$pidx < length(game$players)) {
+        game$pidx <- game$pidx + 1
+      } else {
+        game$pidx  <- 1
+        game$round <- game$round + 1
+      }
+      game$undo_mode <- FALSE
     }
     
     updateNumericInput(session, "round_score", value = 0)

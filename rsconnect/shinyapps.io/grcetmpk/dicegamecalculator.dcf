@@ -5,7 +5,7 @@ account: grcetmpk
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 17310376
-bundleId: 11958585
+bundleId: 11963378
 url: https://grcetmpk.shinyapps.io/dicegamecalculator/
 version: 1
 asMultiple: FALSE
