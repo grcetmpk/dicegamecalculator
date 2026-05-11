@@ -120,6 +120,136 @@ ui <- fluidPage(
       }
       [data-theme='light'] .btn-danger { background: #8795a1 !important; }
 
+      /* Rules Button */
+      .btn-rules {
+        background: #3498db !important; border: none !important;
+        border-radius: 10px !important; font-family: 'Fredoka One', cursive !important;
+        font-size: 1.5rem !important; color: #fff !important; padding: 12px 24px !important;
+        transition: transform .15s, box-shadow .15s !important;
+        box-shadow: 0 4px 14px rgba(52, 152, 219, .35) !important;
+        width: 100%;
+        margin-top: 12px;
+      }
+      .btn-rules:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(52, 152, 219, .5) !important; }
+
+      /* Modal Styles */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.5);
+        animation: fadeIn 0.3s ease-in-out;
+      }
+
+      .modal.show {
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      .modal-content {
+        background-color: var(--surface);
+        margin: 5% auto;
+        padding: 32px;
+        border-radius: 12px;
+        border: 1px solid var(--border-subtle);
+        width: 90%;
+        max-width: 600px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, .2);
+        animation: slideIn 0.3s ease-in-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateY(-50px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid var(--border-subtle);
+      }
+
+      .modal-header h2 {
+        font-family: 'Fredoka One', cursive;
+        font-size: 2rem;
+        color: var(--text);
+        margin: 0;
+      }
+
+      .close-btn {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        cursor: pointer;
+        color: var(--muted);
+        padding: 0;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        transition: background-color .2s, color .2s;
+      }
+
+      .close-btn:hover {
+        background-color: var(--bg);
+        color: var(--accent);
+      }
+
+      .modal-body {
+        color: var(--text);
+        font-size: 1.1rem;
+        line-height: 1.6;
+      }
+
+      .modal-body p {
+        margin-bottom: 12px;
+      }
+
+      .modal-body ul {
+        margin-left: 24px;
+        margin-bottom: 12px;
+      }
+
+      .modal-body li {
+        margin-bottom: 8px;
+      }
+
+      .modal-body h3 {
+        font-family: 'Fredoka One', cursive;
+        font-size: 1.4rem;
+        color: var(--accent);
+        margin-top: 18px;
+        margin-bottom: 12px;
+      }
+
+      .modal-body h4 {
+        font-family: 'Fredoka One', cursive;
+        font-size: 1.1rem;
+        color: var(--text);
+        margin-top: 12px;
+        margin-bottom: 8px;
+      }
+
       /* Layout */
       .main-wrap {
         display:grid; grid-template-columns:360px 1fr;
@@ -238,6 +368,24 @@ ui <- fluidPage(
         transform: none !important;
       }
 
+      /* Button row for side-by-side layout */
+      .button-row {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+      }
+
+      .button-row .btn-undo {
+        flex: 1;
+        margin-top: 0 !important;
+        width: auto;
+      }
+
+      .button-row .btn-rules {
+        flex: 1;
+        margin-top: 0 !important;
+      }
+
       /* Chips */
       .chip-row { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
       .chip {
@@ -338,6 +486,22 @@ ui <- fluidPage(
           document.documentElement.removeAttribute('data-theme');
         }
       });
+
+      // Rules modal functionality
+      function openRulesModal() {
+        document.getElementById('rulesModal').classList.add('show');
+      }
+
+      function closeRulesModal() {
+        document.getElementById('rulesModal').classList.remove('show');
+      }
+
+      window.onclick = function(event) {
+        var modal = document.getElementById('rulesModal');
+        if (event.target == modal) {
+          modal.classList.remove('show');
+        }
+      }
     ")
   ),
   
@@ -346,6 +510,56 @@ ui <- fluidPage(
   div(class = "app-header",
       tags$h1(HTML("🎲 Dice Game Calculator 🎲")),
       p("Track scores and see your game stats!")
+  ),
+  
+  # Rules Modal
+  tags$div(id = "rulesModal", class = "modal",
+           tags$div(class = "modal-content",
+                    tags$div(class = "modal-header",
+                             tags$button(class = "close-btn", onclick = "closeRulesModal()", "×")
+                    ),
+                    tags$div(class = "modal-body", id = "rulesContent",
+                             tags$h3("To Win"),
+                             tags$ul(
+                               tags$li("First to 10,000 points EXACTLY")
+                             ),
+                             
+                             tags$h3("To Get In The Game"),
+                             tags$ul(
+                               tags$li("Before you can start accumulating points toward your score, you must first score 500 points in a single turn (these initial 500 points do not count toward the 10,000-point win target. They only qualify you to start scoring, the following player cannot play off these points).")
+                             ),
+                             
+                             tags$h3("On Your Turn"),
+                             tags$ul(
+                               tags$li("A turn begins with the player rolling five dice."),
+                               tags$li("If you roll and score points you then decide:")
+                             ),
+                             
+                             tags$h4("A. Keep Rolling:"),
+                             tags$ul(
+                               tags$li("Set aside at least one scoring dice (or a scoring set) and roll the remaining dice to try and add more points."),
+                               tags$li("If you score points with all five dice in one turn, you get to roll all five dice again and continue adding points to your current turn total.")
+                             ),
+                             
+                             tags$h4("B. End Turn:"),
+                             tags$ul(
+                               tags$li("Bank the points accumulated during the turn."),
+                               tags$li("If you choose to end your turn and score your points, the next player has the option to \"Play Off\" any remaining dice you had set aside (those not rolled in the final throw of your turn) starting with the number of points you ended your turn with."),
+                               tags$li("If you roll and no dice score points, your turn is over, and you lose all points accumulated during that roll and the following player starts fresh."),
+                               tags$li("If near end of game and you roll over 10,000 you have busted and next player can not continue to score off that player.")
+                             ),
+                             
+                             tags$h3("Scoring"),
+                             tags$ul(
+                               tags$li("5 is worth 50 points"),
+                               tags$li("1 is worth 100 points"),
+                               tags$li("3 x 1 is 1000 points"),
+                               tags$li("3 x any other number is that number in hundreds (ex. 3 x 3 is 300 points)"),
+                               tags$li("Rolling a 4th of same double the points (ex. 4 x 4 = 400 x 2 = 800 points)"),
+                               tags$li("Rolling a sequence of 5 = 1000 points")
+                             )
+                    )
+           )
   ),
   
   uiOutput("setup_ui"),
@@ -386,7 +600,8 @@ server <- function(input, output, session) {
         tags$h2("👥 Player Details"),
         uiOutput("name_fields_ui"),
         hr(),
-        actionButton("start_game", "🎲 Start Game", class = "btn-success")
+        actionButton("start_game", "🎲 Start Game", class = "btn-success"),
+        actionButton("show_rules", "📖 Rules", class = "btn-rules", onclick = "openRulesModal()")
     )
   })
   
@@ -514,7 +729,10 @@ server <- function(input, output, session) {
               ),
               div(
                 hr(),
-                actionButton("reset_game", "Start a New Game", class = "btn-undo")
+                div(class = "button-row",
+                    actionButton("reset_game", "Start a New Game", class = "btn-undo"),
+                    actionButton("show_rules_game", "📖 Rules", class = "btn-rules", onclick = "openRulesModal()")
+                )
               ),
           ),
           
@@ -870,7 +1088,8 @@ server <- function(input, output, session) {
         legend.position   = "right",
         legend.key        = element_rect(fill = NA, color = NA),
         legend.background = element_rect(fill = NA, color = NA)
-      )
+      ) + 
+      ylim(-1, ws)
   }, bg = "transparent")
 }
 
